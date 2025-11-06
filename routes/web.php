@@ -6,6 +6,11 @@ use App\Livewire\Admin\PayPeriods\PayPeriodShow;
 use App\Livewire\Admin\PayPeriods\PayslipForm;
 use Livewire\Volt\Volt;
 
+// Public typing test route (no auth required)
+Route::get('/test/{token}', function (string $token) {
+    return view('pages.typing-test', ['token' => $token]);
+})->middleware('signed')->name('test.take');
+
 Route::middleware(['auth', 'verified'])->group(function () {
     Volt::route('/', 'users.index');
     Route::get('/logout', [AuthController::class, 'logout'])->name('logout');
@@ -16,6 +21,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware('role:admin')->group(function () {
         Route::prefix('admin')->group(function () {
             Volt::route('/users', 'admin.user.users')->name('admin.users');
+            Volt::route('/candidates', 'admin.candidate-manager')->name('admin.candidates.index');
         });
     });
 
