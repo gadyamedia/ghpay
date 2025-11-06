@@ -6,7 +6,9 @@ use App\Models\TestInvitation;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
-use Illuminate\Mail\Mailables\{Content, Envelope, Address};
+use Illuminate\Mail\Mailables\Address;
+use Illuminate\Mail\Mailables\Content;
+use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\URL;
 
@@ -16,8 +18,7 @@ class TestInvitationMail extends Mailable implements ShouldQueue
 
     public function __construct(
         public TestInvitation $invitation
-    ) {
-    }
+    ) {}
 
     public function envelope(): Envelope
     {
@@ -26,7 +27,7 @@ class TestInvitationMail extends Mailable implements ShouldQueue
                 config('mail.from.address'),
                 config('mail.from.name')
             ),
-            subject: 'Typing Test Invitation - ' . $this->invitation->candidate->position_applied,
+            subject: 'Typing Test Invitation - '.$this->invitation->candidate->position_applied,
         );
     }
 

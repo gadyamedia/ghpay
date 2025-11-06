@@ -25,7 +25,7 @@ new class extends Component {
     public function with(): array
     {
         $query = Candidate::query()
-            ->with(['createdBy', 'latestTypingTest', 'activeInvitation'])
+            ->with(['createdBy', 'latestTypingTest.typingTextSample', 'activeInvitation'])
             ->withCount('typingTests');
 
         if ($this->search) {
@@ -63,12 +63,6 @@ new class extends Component {
         $this->showModal = true;
     }
 
-    public function closeModal(): void
-    {
-        $this->showModal = false;
-        $this->resetForm();
-    }
-
     public function save(): void
     {
         $validated = $this->validate([
@@ -88,7 +82,8 @@ new class extends Component {
             $candidate = Candidate::create($validated);
         }
 
-        $this->closeModal();
+        $this->showModal = false;
+        $this->resetForm();
         $this->dispatch('candidate-saved');
     }
 
@@ -96,7 +91,12 @@ new class extends Component {
     {
         $candidate = Candidate::findOrFail($candidateId);
 
-        // Create invitation
+        // Mark old invitation as expired if exists
+        if ($candidate->activeInvitation) {
+            $candidate->activeInvitation->update(['expires_at' => now()]);
+        }
+
+        // Create new invitation
         $invitation = TestInvitation::createForCandidate($candidate);
 
         // Send email
@@ -108,6 +108,12 @@ new class extends Component {
         ]);
 
         session()->flash('success', 'Invitation sent to ' . $candidate->name);
+    }
+
+    public function resendInvitation(int $candidateId): void
+    {
+        $this->sendInvitation($candidateId);
+        session()->flash('success', 'Invitation resent successfully');
     }
 
     public function deleteCandidate(int $candidateId): void
@@ -140,43 +146,41 @@ new class extends Component {
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <!-- Header -->
         <div class="flex justify-between items-center mb-8">
-            <h1 class="text-3xl font-bold text-gray-900">Candidate Management</h1>
-            <button
+            <h1 class="text-3xl font-bold text-gray-900 dark:text-gray-100">Candidate Management</h1>
+            <x-button
+                label="Add Candidate"
+                icon="o-plus"
+                class="btn-primary"
                 wire:click="openModal"
-                class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg"
-            >
-                Add Candidate
-            </button>
+            />
         </div>
 
         <!-- Filters -->
-        <div class="bg-white rounded-lg shadow p-6 mb-6">
+        <x-card class="mb-6">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Search</label>
-                    <input
-                        type="text"
-                        wire:model.live.debounce.300ms="search"
-                        placeholder="Search by name, email, or position..."
-                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
-                    >
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Status</label>
-                    <select
-                        wire:model.live="statusFilter"
-                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
-                    >
-                        <option value="all">All Statuses</option>
-                        <option value="invited">Invited</option>
-                        <option value="in_progress">In Progress</option>
-                        <option value="completed">Completed</option>
-                        <option value="hired">Hired</option>
-                        <option value="rejected">Rejected</option>
-                    </select>
-                </div>
+                <x-input
+                    label="Search"
+                    wire:model.live.debounce.300ms="search"
+                    placeholder="Search by name, email, or position..."
+                    icon="o-magnifying-glass"
+                    clearable
+                />
+
+                <x-select
+                    label="Status"
+                    wire:model.live="statusFilter"
+                    icon="o-funnel"
+                    :options="[
+                        ['id' => 'all', 'name' => 'All Statuses'],
+                        ['id' => 'invited', 'name' => 'Invited'],
+                        ['id' => 'in_progress', 'name' => 'In Progress'],
+                        ['id' => 'completed', 'name' => 'Completed'],
+                        ['id' => 'hired', 'name' => 'Hired'],
+                        ['id' => 'rejected', 'name' => 'Rejected'],
+                    ]"
+                />
             </div>
-        </div>
+        </x-card>
 
         <!-- Candidates Table -->
         <div class="bg-white rounded-lg shadow overflow-hidden">
@@ -186,8 +190,9 @@ new class extends Component {
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Position</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Latest Test</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Best WPM</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tests</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Tests</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                     </tr>
                 </thead>
@@ -214,32 +219,61 @@ new class extends Component {
                                     {{ ucfirst(str_replace('_', ' ', $candidate->status)) }}
                                 </span>
                             </td>
+                            <td class="px-6 py-4 text-sm text-gray-900">
+                                @if ($candidate->latestTypingTest)
+                                    <div class="font-medium text-gray-900">{{ $candidate->latestTypingTest->typingTextSample?->title ?? 'Custom' }}</div>
+                                    <div class="text-xs text-gray-500">
+                                        {{ $candidate->latestTypingTest->completed_at->diffForHumans() }}
+                                    </div>
+                                @else
+                                    <span class="text-gray-400">No tests yet</span>
+                                @endif
+                            </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                 {{ $candidate->bestWpm ?? 'N/A' }}
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                 {{ $candidate->typing_tests_count }}
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                                <button
-                                    wire:click="openModal({{ $candidate->id }})"
-                                    class="text-blue-600 hover:text-blue-900"
-                                >
-                                    Edit
-                                </button>
-                                @if (!$candidate->activeInvitation)
-                                    <button
-                                        wire:click="sendInvitation({{ $candidate->id }})"
-                                        class="text-green-600 hover:text-green-900"
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <div class="flex items-center gap-3">
+                                    <a
+                                        href="{{ route('admin.candidates.show', $candidate->id) }}"
+                                        class="text-indigo-600 hover:text-indigo-900 hover:underline"
                                     >
-                                        Send Test
+                                        View
+                                    </a>
+                                    <button
+                                        type="button"
+                                        wire:click="openModal({{ $candidate->id }})"
+                                        class="text-blue-600 hover:text-blue-900 hover:underline cursor-pointer"
+                                    >
+                                        Edit
                                     </button>
-                                @endif
-                                <button
-                                    wire:click="deleteCandidate({{ $candidate->id }})"
-                                    wire:confirm="Are you sure you want to delete this candidate?"
-                                    class="text-red-600 hover:text-red-900"
-                                >
+                                    @if ($candidate->activeInvitation)
+                                        <button
+                                            type="button"
+                                            wire:click="resendInvitation({{ $candidate->id }})"
+                                            class="text-orange-600 hover:text-orange-900 hover:underline cursor-pointer"
+                                            title="Send a new invitation link"
+                                        >
+                                            Resend Test
+                                        </button>
+                                    @else
+                                        <button
+                                            type="button"
+                                            wire:click="sendInvitation({{ $candidate->id }})"
+                                            class="text-green-600 hover:text-green-900 hover:underline cursor-pointer"
+                                        >
+                                            Send Test
+                                        </button>
+                                    @endif
+                                    <button
+                                        type="button"
+                                        wire:click="deleteCandidate({{ $candidate->id }})"
+                                        wire:confirm="Are you sure you want to delete this candidate?"
+                                        class="text-red-600 hover:text-red-900 hover:underline cursor-pointer"
+                                    >
                                     Delete
                                 </button>
                             </td>
@@ -262,104 +296,71 @@ new class extends Component {
     </div>
 
     <!-- Modal -->
-    @if ($showModal)
-        <div class="fixed inset-0 z-50 overflow-y-auto" x-data="{ show: @entangle('showModal') }">
-            <div class="flex items-center justify-center min-h-screen px-4">
-                <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" wire:click="closeModal"></div>
+    <x-modal wire:model="showModal" :title="$editingId ? 'Edit Candidate' : 'Add Candidate'" subtitle="Manage candidate information" class="backdrop-blur">
+        <x-form wire:submit="save">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <x-input
+                    label="Name"
+                    wire:model="name"
+                    icon="o-user"
+                    placeholder="Full name"
+                    inline
+                />
 
-                <div class="relative bg-white rounded-lg max-w-2xl w-full p-6">
-                    <h2 class="text-2xl font-bold text-gray-900 mb-6">
-                        {{ $editingId ? 'Edit Candidate' : 'Add Candidate' }}
-                    </h2>
-
-                    <form wire:submit="save" class="space-y-4">
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Name *</label>
-                                <input
-                                    type="text"
-                                    wire:model="name"
-                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
-                                >
-                                @error('name') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
-                            </div>
-
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Email *</label>
-                                <input
-                                    type="email"
-                                    wire:model="email"
-                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
-                                >
-                                @error('email') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
-                            </div>
-                        </div>
-
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Phone</label>
-                                <input
-                                    type="text"
-                                    wire:model="phone"
-                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
-                                >
-                                @error('phone') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
-                            </div>
-
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Position Applied *</label>
-                                <input
-                                    type="text"
-                                    wire:model="position_applied"
-                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
-                                >
-                                @error('position_applied') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
-                            </div>
-                        </div>
-
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Status *</label>
-                            <select
-                                wire:model="status"
-                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
-                            >
-                                <option value="invited">Invited</option>
-                                <option value="in_progress">In Progress</option>
-                                <option value="completed">Completed</option>
-                                <option value="hired">Hired</option>
-                                <option value="rejected">Rejected</option>
-                            </select>
-                            @error('status') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
-                        </div>
-
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Notes</label>
-                            <textarea
-                                wire:model="notes"
-                                rows="3"
-                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
-                            ></textarea>
-                            @error('notes') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
-                        </div>
-
-                        <div class="flex justify-end space-x-3 pt-4">
-                            <button
-                                type="button"
-                                wire:click="closeModal"
-                                class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type="submit"
-                                class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                            >
-                                {{ $editingId ? 'Update' : 'Create' }}
-                            </button>
-                        </div>
-                    </form>
-                </div>
+                <x-input
+                    label="Email"
+                    wire:model="email"
+                    type="email"
+                    icon="o-envelope"
+                    placeholder="email@example.com"
+                    inline
+                />
             </div>
-        </div>
-    @endif
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <x-input
+                    label="Phone"
+                    wire:model="phone"
+                    icon="o-phone"
+                    placeholder="Phone number"
+                    inline
+                />
+
+                <x-input
+                    label="Position Applied"
+                    wire:model="position_applied"
+                    icon="o-briefcase"
+                    placeholder="Position"
+                    inline
+                />
+            </div>
+
+            <x-select
+                label="Status"
+                wire:model="status"
+                icon="o-flag"
+                :options="[
+                    ['id' => 'invited', 'name' => 'Invited'],
+                    ['id' => 'in_progress', 'name' => 'In Progress'],
+                    ['id' => 'completed', 'name' => 'Completed'],
+                    ['id' => 'hired', 'name' => 'Hired'],
+                    ['id' => 'rejected', 'name' => 'Rejected'],
+                ]"
+                inline
+            />
+
+            <x-textarea
+                label="Notes"
+                wire:model="notes"
+                placeholder="Additional notes about the candidate..."
+                rows="3"
+                inline
+            />
+
+            <x-slot:actions>
+                <x-button label="Cancel" @click="$wire.showModal = false" />
+                <x-button label="{{ $editingId ? 'Update' : 'Create' }}" class="btn-primary" type="submit" spinner="save" />
+            </x-slot:actions>
+        </x-form>
+    </x-modal>
 </div>

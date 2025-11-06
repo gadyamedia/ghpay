@@ -14,8 +14,7 @@ class SendTestInvitationJob implements ShouldQueue
 
     public function __construct(
         public TestInvitation $invitation
-    ) {
-    }
+    ) {}
 
     public function handle(): void
     {

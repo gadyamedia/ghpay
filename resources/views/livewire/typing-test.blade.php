@@ -1,24 +1,38 @@
 <?php
 
-use Livewire\Volt\Component;
-use App\Models\{TypingTest, TypingTextSample, TestInvitation};
+use App\Models\TestInvitation;
+use App\Models\TypingTest;
+use App\Models\TypingTextSample;
 use Livewire\Attributes\On;
+use Livewire\Volt\Component;
 
-new class extends Component {
+new class extends Component
+{
     public string $token = '';
+
     public ?TestInvitation $invitation = null;
+
     public ?TypingTextSample $textSample = null;
 
     public string $testStatus = 'not_started'; // not_started, in_progress, completed
+
     public string $typedText = '';
+
     public int $elapsedSeconds = 0;
+
+    public bool $timerStarted = false;
+
     public array $keystrokeData = [];
 
     // Results
     public ?int $wpm = null;
+
     public ?float $accuracy = null;
+
     public ?int $totalCharacters = null;
+
     public ?int $correctCharacters = null;
+
     public ?int $incorrectCharacters = null;
 
     public function mount(string $token): void
@@ -26,7 +40,7 @@ new class extends Component {
         $this->token = $token;
         $this->invitation = TestInvitation::where('token', $token)->first();
 
-        if (!$this->invitation || !$this->invitation->isValid()) {
+        if (! $this->invitation || ! $this->invitation->isValid()) {
             abort(403, 'Invalid or expired invitation.');
         }
 
@@ -39,7 +53,7 @@ new class extends Component {
         // Get a random text sample
         $this->textSample = TypingTextSample::getRandomActive();
 
-        if (!$this->textSample) {
+        if (! $this->textSample) {
             abort(500, 'No typing samples available.');
         }
     }
@@ -49,13 +63,29 @@ new class extends Component {
         $this->testStatus = 'in_progress';
         $this->typedText = '';
         $this->elapsedSeconds = 0;
+        $this->timerStarted = false;
         $this->keystrokeData = [];
+    }
+
+    public function updated($property): void
+    {
+        if ($property === 'typedText') {
+            // Start timer on first character
+            if (! $this->timerStarted && strlen($this->typedText) > 0) {
+                $this->timerStarted = true;
+            }
+
+            // Auto-submit when finished typing
+            if (strlen($this->typedText) >= strlen($this->textSample->content)) {
+                $this->submitTest();
+            }
+        }
     }
 
     #[On('test-tick')]
     public function updateTimer(): void
     {
-        if ($this->testStatus === 'in_progress') {
+        if ($this->testStatus === 'in_progress' && $this->timerStarted) {
             $this->elapsedSeconds++;
         }
     }
@@ -72,9 +102,9 @@ new class extends Component {
             $this->typedText
         );
 
-        $this->totalCharacters = $analysis['total'];
-        $this->correctCharacters = $analysis['correct'];
-        $this->incorrectCharacters = $analysis['incorrect'];
+        $this->totalCharacters = $analysis['total_characters'];
+        $this->correctCharacters = $analysis['correct_characters'];
+        $this->incorrectCharacters = $analysis['incorrect_characters'];
 
         // Calculate metrics
         $this->wpm = TypingTest::calculateWpm(
@@ -199,31 +229,105 @@ new class extends Component {
                     </div>
                 </div>
 
-                <!-- Text to Type -->
-                <div class="bg-gray-50 rounded-lg p-6 mb-6 border-2 border-gray-300">
-                    <p class="text-lg leading-relaxed text-gray-800 font-mono whitespace-pre-wrap">{{ $textSample->content }}</p>
+                <!-- Text to Type with Real-time Highlighting (Condensed View) -->
+                <div class="bg-gray-50 rounded-lg p-6 mb-6 border-2 border-gray-300 select-none overflow-hidden">
+                    <div
+                        class="text-2xl leading-loose font-mono whitespace-pre-wrap break-words"
+                        x-data="{
+                            typed: @entangle('typedText').live,
+                            scrollToPosition() {
+                                const currentChar = this.$el.querySelector('[data-index=\'' + this.typed.length + '\']');
+                                if (currentChar) {
+                                    currentChar.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                }
+                            }
+                        }"
+                        x-effect="scrollToPosition()"
+                        style="max-height: 200px; overflow-y: auto; scroll-behavior: smooth;"
+                        id="text-display"
+                    >
+                        @php
+                            $chars = mb_str_split($textSample->content);
+                        @endphp
+                        @foreach ($chars as $index => $char)<span
+                                data-index="{{ $index }}"
+                                x-bind:class="{
+                                    'bg-green-200 text-green-900': typed.length > {{ $index }} && typed[{{ $index }}] === '{{ addslashes($char) }}',
+                                    'bg-red-200 text-red-900': typed.length > {{ $index }} && typed[{{ $index }}] !== '{{ addslashes($char) }}',
+                                    'bg-blue-300 text-blue-900 font-bold border-2 border-blue-500': typed.length === {{ $index }},
+                                    'text-gray-500': typed.length < {{ $index }}
+                                }"
+                                class="transition-colors duration-100 inline-block"
+                                style="min-width: {{ $char === ' ' ? '0.5em' : 'auto' }};"
+                            >@if($char === ' ')&nbsp;@else{{ $char }}@endif</span>@endforeach
+                    </div>
+                    <div class="mt-2 text-xs text-gray-500 text-center">
+                        Text automatically scrolls as you type • Focus follows your position
+                    </div>
                 </div>
 
-                <!-- Typing Area -->
-                <div class="mb-6">
+                <!-- Typing Area (Hidden) -->
+                <div class="mb-6" x-data="{ focused: false }">
                     <label class="block text-sm font-medium text-gray-700 mb-2">
-                        Type here:
+                        Type the text above ({{ strlen($typedText) }}/{{ strlen($textSample->content) }} characters)
                     </label>
                     <textarea
                         wire:model.live="typedText"
-                        class="w-full h-40 px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring focus:ring-blue-200 font-mono text-lg"
+                        class="w-full h-32 px-4 py-3 border-2 rounded-lg focus:border-blue-500 focus:ring focus:ring-blue-200 font-mono text-lg"
+                        :class="focused ? 'border-blue-500' : 'border-gray-300'"
                         placeholder="Start typing..."
                         autofocus
+                        @focus="focused = true"
+                        @blur="focused = false"
+                        onpaste="return false;"
+                        oncopy="return false;"
+                        oncut="return false;"
+                        ondrop="return false;"
+                        autocomplete="off"
+                        spellcheck="false"
                     ></textarea>
+                    <div class="flex justify-between items-center mt-1">
+                        <p class="text-xs text-gray-500">
+                            ⚠️ Copy/paste is disabled • Test auto-submits when complete
+                        </p>
+                        <div class="flex gap-4 text-xs">
+                            <span class="flex items-center gap-1">
+                                <span class="w-3 h-3 bg-green-200 rounded"></span>
+                                <span>Correct</span>
+                            </span>
+                            <span class="flex items-center gap-1">
+                                <span class="w-3 h-3 bg-red-200 rounded"></span>
+                                <span>Wrong</span>
+                            </span>
+                            <span class="flex items-center gap-1">
+                                <span class="w-3 h-3 bg-blue-300 border-2 border-blue-500 rounded"></span>
+                                <span>Current</span>
+                            </span>
+                        </div>
+                    </div>
                 </div>
 
-                <!-- Submit Button -->
+                <!-- Progress Bar -->
+                <div class="mb-6">
+                    <div class="flex justify-between text-sm text-gray-600 mb-2">
+                        <span>Progress</span>
+                        <span>{{ number_format((strlen($typedText) / strlen($textSample->content)) * 100, 1) }}%</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2.5">
+                        <div
+                            class="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
+                            style="width: {{ (strlen($typedText) / strlen($textSample->content)) * 100 }}%"
+                        ></div>
+                    </div>
+                </div>
+
+                <!-- Manual Submit Button (Optional) -->
                 <div class="flex justify-end">
                     <button
                         wire:click="submitTest"
                         class="bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-8 rounded-lg transition duration-200"
                     >
-                        Submit Test
+                        Submit Test Early
                     </button>
                 </div>
             </div>

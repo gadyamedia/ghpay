@@ -22,6 +22,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::prefix('admin')->group(function () {
             Volt::route('/users', 'admin.user.users')->name('admin.users');
             Volt::route('/candidates', 'admin.candidate-manager')->name('admin.candidates.index');
+            Volt::route('/candidates/{candidateId}', 'admin.candidate-results')->name('admin.candidates.show');
+            Volt::route('/typing-samples', 'admin.typing-text-samples')->name('admin.typing-samples.index');
         });
     });
 
