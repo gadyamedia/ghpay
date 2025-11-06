@@ -27,6 +27,8 @@ new class extends Component
     // Results
     public ?int $wpm = null;
 
+    public ?int $liveWpm = 0;
+
     public ?float $accuracy = null;
 
     public ?int $totalCharacters = null;
@@ -38,7 +40,7 @@ new class extends Component
     public function mount(string $token): void
     {
         $this->token = $token;
-        $this->invitation = TestInvitation::where('token', $token)->first();
+        $this->invitation = TestInvitation::with('typingTextSample')->where('token', $token)->first();
 
         if (! $this->invitation || ! $this->invitation->isValid()) {
             abort(403, 'Invalid or expired invitation.');
@@ -50,8 +52,12 @@ new class extends Component
             request()->userAgent()
         );
 
-        // Get a random text sample
-        $this->textSample = TypingTextSample::getRandomActive();
+        // Use assigned test sample if available, otherwise get random
+        if ($this->invitation->typing_text_sample_id && $this->invitation->typingTextSample) {
+            $this->textSample = $this->invitation->typingTextSample;
+        } else {
+            $this->textSample = TypingTextSample::getRandomActive();
+        }
 
         if (! $this->textSample) {
             abort(500, 'No typing samples available.');
@@ -75,10 +81,34 @@ new class extends Component
                 $this->timerStarted = true;
             }
 
+            // Calculate live WPM
+            $this->calculateLiveWpm();
+
             // Auto-submit when finished typing
             if (strlen($this->typedText) >= strlen($this->textSample->content)) {
                 $this->submitTest();
             }
+        }
+    }
+
+    public function calculateLiveWpm(): void
+    {
+        if ($this->elapsedSeconds > 0 && strlen($this->typedText) > 0) {
+            // Analyze current typing to get correct characters
+            $analysis = TypingTest::analyzeTyping(
+                substr($this->textSample->content, 0, strlen($this->typedText)),
+                $this->typedText
+            );
+
+            $correctChars = $analysis['correct_characters'];
+
+            // Calculate WPM based on correct characters typed so far
+            $this->liveWpm = TypingTest::calculateWpm(
+                $correctChars,
+                $this->elapsedSeconds
+            );
+        } else {
+            $this->liveWpm = 0;
         }
     }
 
@@ -87,6 +117,7 @@ new class extends Component
     {
         if ($this->testStatus === 'in_progress' && $this->timerStarted) {
             $this->elapsedSeconds++;
+            $this->calculateLiveWpm();
         }
     }
 
@@ -221,11 +252,25 @@ new class extends Component
             >
                 <!-- Timer and Stats -->
                 <div class="flex justify-between items-center mb-6 pb-4 border-b">
-                    <div class="text-2xl font-bold text-gray-900">
-                        Time: {{ floor($elapsedSeconds / 60) }}:{{ str_pad($elapsedSeconds % 60, 2, '0', STR_PAD_LEFT) }}
+                    <div class="flex items-center gap-6">
+                        <div>
+                            <div class="text-sm text-gray-500">Time</div>
+                            <div class="text-2xl font-bold text-gray-900">
+                                {{ floor($elapsedSeconds / 60) }}:{{ str_pad($elapsedSeconds % 60, 2, '0', STR_PAD_LEFT) }}
+                            </div>
+                        </div>
+                        <div class="border-l-2 pl-6">
+                            <div class="text-sm text-gray-500">Live WPM</div>
+                            <div class="text-2xl font-bold text-blue-600">
+                                {{ $liveWpm }}
+                            </div>
+                        </div>
                     </div>
-                    <div class="text-lg text-gray-600">
-                        Characters: {{ strlen($typedText) }} / {{ strlen($textSample->content) }}
+                    <div>
+                        <div class="text-sm text-gray-500 text-right">Characters</div>
+                        <div class="text-lg text-gray-600">
+                            {{ strlen($typedText) }} / {{ strlen($textSample->content) }}
+                        </div>
                     </div>
                 </div>
 

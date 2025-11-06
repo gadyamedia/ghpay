@@ -18,15 +18,17 @@ class DatabaseSeeder extends Seeder
     {
         // User::factory(10)->create();
 
-        User::create([
-            'name' => 'Antony Boguslavskiy',
-            'email' => 'antony@gadyamedia.com',
-            'password' => Hash::make('Kostyavika1'),
-        ]);
-
         $this->call([
             RolesTableSeeder::class,
             // PayPeriodSeeder::class,
         ]);
+
+        User::create([
+            'name' => 'Antony Boguslavskiy',
+            'email' => 'antony@gadyamedia.com',
+            'password' => Hash::make('Kostyavika1'),
+            'role_id' => 1,
+        ]);
+
     }
 }

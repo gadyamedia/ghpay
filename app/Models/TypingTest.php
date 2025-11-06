@@ -42,6 +42,8 @@ class TypingTest extends Model
     /**
      * Calculate WPM (Words Per Minute)
      * Standard: 1 word = 5 characters
+     * Formula: Total Number of Words = Total Keys Pressed / 5
+     *          WPM = Total Number of Words / Time Elapsed in Minutes (rounded down)
      */
     public static function calculateWpm(int $totalCharacters, int $durationSeconds): int
     {
@@ -52,7 +54,7 @@ class TypingTest extends Model
         $minutes = $durationSeconds / 60;
         $words = $totalCharacters / 5;
 
-        return (int) round($words / $minutes);
+        return (int) floor($words / $minutes);
     }
 
     /**

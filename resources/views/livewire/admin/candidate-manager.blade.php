@@ -1,7 +1,7 @@
 <?php
 
 use Livewire\Volt\Component;
-use App\Models\{Candidate, TestInvitation};
+use App\Models\{Candidate, TestInvitation, TypingTextSample};
 use App\Jobs\SendTestInvitationJob;
 use Livewire\Attributes\On;
 use Livewire\WithPagination;
@@ -12,6 +12,7 @@ new class extends Component {
     public string $search = '';
     public string $statusFilter = 'all';
     public bool $showModal = false;
+    public bool $showTestModal = false;
 
     // Form fields
     public ?int $editingId = null;
@@ -21,6 +22,10 @@ new class extends Component {
     public string $position_applied = '';
     public string $notes = '';
     public string $status = 'invited';
+
+    // Test invitation fields
+    public ?int $sendingToId = null;
+    public ?int $selectedTestSampleId = null;
 
     public function with(): array
     {
@@ -42,6 +47,7 @@ new class extends Component {
 
         return [
             'candidates' => $query->latest()->paginate(15),
+            'testSamples' => TypingTextSample::where('is_active', true)->orderBy('difficulty')->get(),
         ];
     }
 
@@ -87,17 +93,28 @@ new class extends Component {
         $this->dispatch('candidate-saved');
     }
 
-    public function sendInvitation(int $candidateId): void
+    public function openTestModal(int $candidateId): void
     {
-        $candidate = Candidate::findOrFail($candidateId);
+        $this->sendingToId = $candidateId;
+        $this->selectedTestSampleId = null;
+        $this->showTestModal = true;
+    }
+
+    public function sendInvitation(): void
+    {
+        $this->validate([
+            'selectedTestSampleId' => 'required|exists:typing_text_samples,id',
+        ]);
+
+        $candidate = Candidate::findOrFail($this->sendingToId);
 
         // Mark old invitation as expired if exists
         if ($candidate->activeInvitation) {
             $candidate->activeInvitation->update(['expires_at' => now()]);
         }
 
-        // Create new invitation
-        $invitation = TestInvitation::createForCandidate($candidate);
+        // Create new invitation with specific test sample
+        $invitation = TestInvitation::createForCandidate($candidate, $this->selectedTestSampleId);
 
         // Send email
         SendTestInvitationJob::dispatch($invitation);
@@ -107,13 +124,16 @@ new class extends Component {
             'invited_at' => now(),
         ]);
 
+        $this->showTestModal = false;
+        $this->sendingToId = null;
+        $this->selectedTestSampleId = null;
+
         session()->flash('success', 'Invitation sent to ' . $candidate->name);
     }
 
     public function resendInvitation(int $candidateId): void
     {
-        $this->sendInvitation($candidateId);
-        session()->flash('success', 'Invitation resent successfully');
+        $this->openTestModal($candidateId);
     }
 
     public function deleteCandidate(int $candidateId): void
@@ -253,7 +273,7 @@ new class extends Component {
                                     @if ($candidate->activeInvitation)
                                         <button
                                             type="button"
-                                            wire:click="resendInvitation({{ $candidate->id }})"
+                                            wire:click="openTestModal({{ $candidate->id }})"
                                             class="text-orange-600 hover:text-orange-900 hover:underline cursor-pointer"
                                             title="Send a new invitation link"
                                         >
@@ -262,7 +282,7 @@ new class extends Component {
                                     @else
                                         <button
                                             type="button"
-                                            wire:click="sendInvitation({{ $candidate->id }})"
+                                            wire:click="openTestModal({{ $candidate->id }})"
                                             class="text-green-600 hover:text-green-900 hover:underline cursor-pointer"
                                         >
                                             Send Test
@@ -360,6 +380,71 @@ new class extends Component {
             <x-slot:actions>
                 <x-button label="Cancel" @click="$wire.showModal = false" />
                 <x-button label="{{ $editingId ? 'Update' : 'Create' }}" class="btn-primary" type="submit" spinner="save" />
+            </x-slot:actions>
+        </x-form>
+    </x-modal>
+
+    <!-- Send Test Modal -->
+    <x-modal wire:model="showTestModal" title="Send Typing Test" subtitle="Select a test sample to send" persistent>
+        <x-form wire:submit="sendInvitation">
+            <div class="space-y-4">
+                <p class="text-sm text-gray-600 dark:text-gray-400">
+                    Choose which typing test sample to send to the candidate. Each test has different difficulty levels and content.
+                </p>
+
+                @if ($testSamples->isEmpty())
+                    <x-alert icon="o-exclamation-triangle" class="alert-warning">
+                        No active test samples available. Please create test samples first.
+                    </x-alert>
+                @else
+                    <div class="space-y-3">
+                        @foreach ($testSamples as $sample)
+                            <label class="flex items-start p-4 border rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition
+                                {{ $selectedTestSampleId === $sample->id ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-300 dark:border-gray-600' }}">
+                                <input
+                                    type="radio"
+                                    wire:model="selectedTestSampleId"
+                                    value="{{ $sample->id }}"
+                                    class="mt-1 mr-3"
+                                >
+                                <div class="flex-1">
+                                    <div class="flex items-center justify-between mb-1">
+                                        <h4 class="font-semibold text-gray-900 dark:text-gray-100">{{ $sample->title }}</h4>
+                                        <span class="px-2 py-1 text-xs font-semibold rounded-full capitalize
+                                            {{ match($sample->difficulty) {
+                                                'easy' => 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+                                                'medium' => 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
+                                                'hard' => 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
+                                            } }}">
+                                            {{ $sample->difficulty }}
+                                        </span>
+                                    </div>
+                                    <p class="text-sm text-gray-600 dark:text-gray-400">{{ $sample->word_count }} words</p>
+                                    <p class="text-xs text-gray-500 dark:text-gray-500 mt-1 line-clamp-2">{{ Str::limit($sample->content, 100) }}</p>
+                                </div>
+                            </label>
+                        @endforeach
+                    </div>
+
+                    @error('selectedTestSampleId')
+                        <p class="text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
+                    @enderror
+                @endif
+
+                <x-alert icon="o-shield-check" class="alert-info">
+                    <strong>Anti-Cheat Measures:</strong> Copy/paste disabled, browser spellcheck disabled, test auto-submits when complete.
+                </x-alert>
+            </div>
+
+            <x-slot:actions>
+                <x-button label="Cancel" @click="$wire.showTestModal = false" />
+                <x-button 
+                    label="Send Test Invitation" 
+                    class="btn-primary" 
+                    type="submit" 
+                    spinner="sendInvitation"
+                    :disabled="!$selectedTestSampleId"
+                />
             </x-slot:actions>
         </x-form>
     </x-modal>

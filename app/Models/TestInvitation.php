@@ -10,6 +10,7 @@ class TestInvitation extends Model
 {
     protected $fillable = [
         'candidate_id',
+        'typing_text_sample_id',
         'token',
         'expires_at',
         'opened_at',
@@ -29,13 +30,19 @@ class TestInvitation extends Model
         return $this->belongsTo(Candidate::class);
     }
 
+    public function typingTextSample(): BelongsTo
+    {
+        return $this->belongsTo(TypingTextSample::class);
+    }
+
     /**
      * Generate a new invitation
      */
-    public static function createForCandidate(Candidate $candidate, int $expiresInHours = 72): self
+    public static function createForCandidate(Candidate $candidate, ?int $typingTextSampleId = null, int $expiresInHours = 72): self
     {
         return self::create([
             'candidate_id' => $candidate->id,
+            'typing_text_sample_id' => $typingTextSampleId,
             'token' => Str::random(64),
             'expires_at' => now()->addHours($expiresInHours),
         ]);

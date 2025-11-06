@@ -49,9 +49,9 @@
 
                 <x-menu-item title="Users" icon="o-users" link="{{ route('admin.users') }}"  route="admin.users" />
                 <x-menu-item title="Pay Periods" icon="o-currency-dollar" link="{{ route('admin.pay-periods.index') }}" route="admin.pay-periods.*" />
-                
+
                 <x-menu-separator />
-                
+
                 <x-menu-item title="Candidates" icon="o-user-group" link="{{ route('admin.candidates.index') }}" route="admin.candidates.*" />
                 <x-menu-item title="Typing Samples" icon="o-document-text" link="{{ route('admin.typing-samples.index') }}" route="admin.typing-samples.*" />
 

@@ -10,7 +10,7 @@ new class extends Component {
 
     public bool $showModal = false;
     public ?int $editingId = null;
-    
+
     // Form fields
     public string $title = '';
     public string $content = '';
