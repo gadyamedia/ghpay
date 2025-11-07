@@ -47,6 +47,10 @@
                     <x-menu-separator />
                 @endif
 
+                <x-menu-item title="Dashboard" icon="o-chart-bar" link="{{ route('admin.dashboard') }}" route="admin.dashboard" />
+                
+                <x-menu-separator />
+
                 <x-menu-item title="Users" icon="o-users" link="{{ route('admin.users') }}"  route="admin.users" />
                 <x-menu-item title="Pay Periods" icon="o-currency-dollar" link="{{ route('admin.pay-periods.index') }}" route="admin.pay-periods.*" />
 

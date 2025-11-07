@@ -19,13 +19,22 @@ Volt::route('/privacy-policy', 'legal.privacypolicy')->name('privacy.policy');
 Volt::route('/terms-of-service', 'legal.terms-of-service')->name('terms.of.service');
 
 Route::middleware(['auth', 'verified'])->group(function () {
-    Volt::route('/', 'users.index');
+    // Root route - redirect based on user role
+    Route::get('/', function () {
+        if (auth()->user()->isRole('admin')) {
+            return redirect()->route('admin.dashboard');
+        }
+
+        return redirect()->route('admin.pay-periods.index');
+    })->name('home');
+
     Route::get('/logout', [AuthController::class, 'logout'])->name('logout');
     Route::get('/admin/pay-periods', PayPeriodManager::class)->name('admin.pay-periods.index');
     Route::get('/admin/payslips/{payslip}', PayslipForm::class)->name('admin.payslips.edit');
     Route::get('/admin/pay-periods/{period}', PayPeriodShow::class)->name('admin.pay-periods.show');
 
     Route::middleware('role:admin')->group(function () {
+        Volt::route('/admin', 'admin.dashboard')->name('admin.dashboard');
         Route::prefix('admin')->group(function () {
             Volt::route('/users', 'admin.user.users')->name('admin.users');
             Volt::route('/candidates', 'admin.candidate-manager')->name('admin.candidates.index');
