@@ -3,7 +3,6 @@
 use App\Models\TestInvitation;
 use App\Models\TypingTest;
 use App\Models\TypingTextSample;
-use Livewire\Attributes\On;
 use Livewire\Volt\Component;
 
 new class extends Component
@@ -75,55 +74,39 @@ new class extends Component
 
     public function updated($property): void
     {
-        if ($property === 'typedText') {
-            // Start timer on first character
-            if (! $this->timerStarted && strlen($this->typedText) > 0) {
-                $this->timerStarted = true;
-            }
+        // This method is no longer needed as typing is handled client-side
+        // Kept as a placeholder in case of fallback needs
+    }
 
-            // Calculate live WPM
-            $this->calculateLiveWpm();
-
-            // Note: Test now auto-submits after 60 seconds (see updateTimer method)
-            // Users can also manually submit before time runs out
-        }
+    public function updatedTypedText(): void
+    {
+        // This method is no longer needed as typing is handled client-side
+        // Kept as a placeholder in case of fallback needs
     }
 
     public function calculateLiveWpm(): void
     {
-        if ($this->elapsedSeconds > 0 && strlen($this->typedText) > 0) {
-            // Calculate WPM based on total characters typed so far (Gross WPM)
-            // This matches how typingtest.com and other typing tests calculate it
-            $typedLength = strlen($this->typedText);
-
-            $this->liveWpm = TypingTest::calculateWpm(
-                $typedLength,
-                $this->elapsedSeconds
-            );
-        } else {
-            $this->liveWpm = 0;
-        }
+        // This method is no longer needed - WPM calculated in JavaScript
+        // Kept as a placeholder in case of fallback needs
     }
 
-    #[On('test-tick')]
     public function updateTimer(): void
     {
-        if ($this->testStatus === 'in_progress' && $this->timerStarted) {
-            $this->elapsedSeconds++;
-            $this->calculateLiveWpm();
-
-            // Auto-submit after 60 seconds (1 minute - standard typing test duration)
-            if ($this->elapsedSeconds >= 60) {
-                $this->submitTest();
-            }
-        }
+        // This method is no longer needed - timer handled in JavaScript
+        // Kept as a placeholder in case of fallback needs
     }
 
     public function submitTest(): void
     {
-        if ($this->testStatus !== 'in_progress') {
-            return;
-        }
+        // This method is deprecated - use saveTestResults() instead
+        // Kept for backward compatibility only
+    }
+
+    // New method for JavaScript to submit results
+    public function saveTestResults(array $results): void
+    {
+        $this->typedText = $results['typedText'];
+        $this->elapsedSeconds = $results['duration'];
 
         // Analyze the typing
         $analysis = TypingTest::analyzeTyping(
@@ -134,21 +117,11 @@ new class extends Component
         $this->totalCharacters = $analysis['total_characters'];
         $this->correctCharacters = $analysis['correct_characters'];
         $this->incorrectCharacters = $analysis['incorrect_characters'];
-
-        // Calculate metrics
-        // WPM uses total characters typed (Gross WPM), not just correct ones
-        $this->wpm = TypingTest::calculateWpm(
-            $this->totalCharacters,
-            $this->elapsedSeconds
-        );
-
-        $this->accuracy = TypingTest::calculateAccuracy(
-            $this->correctCharacters,
-            $this->totalCharacters
-        );
+        $this->wpm = $results['wpm'];
+        $this->accuracy = $results['accuracy'];
 
         // Save the test
-        $test = TypingTest::create([
+        TypingTest::create([
             'candidate_id' => $this->invitation->candidate_id,
             'typing_text_sample_id' => $this->textSample->id,
             'original_text' => $this->textSample->content,
@@ -159,15 +132,13 @@ new class extends Component
             'total_characters' => $this->totalCharacters,
             'correct_characters' => $this->correctCharacters,
             'incorrect_characters' => $this->incorrectCharacters,
-            'keystroke_data' => $this->keystrokeData,
+            'keystroke_data' => [],
             'started_at' => now()->subSeconds($this->elapsedSeconds),
             'completed_at' => now(),
         ]);
 
         // Mark invitation as completed
         $this->invitation->markAsCompleted();
-
-        // Update candidate status
         $this->invitation->candidate->update(['status' => 'completed']);
 
         $this->testStatus = 'completed';
@@ -238,37 +209,107 @@ new class extends Component
             <!-- Typing Test Screen -->
             <div class="bg-white rounded-lg shadow-lg p-8"
                 x-data="{
+                    startTime: null,
+                    elapsedSeconds: 0,
                     timer: null,
+                    typedText: '',
+                    liveWpm: 0,
+                    testDuration: 60,
+                    timerStarted: false,
+                    
                     init() {
-                        this.timer = setInterval(() => {
-                            $wire.dispatch('test-tick');
-                        }, 1000);
+                        // Don't start timer yet - wait for first keystroke
+                        // Focus the textarea
+                        this.$nextTick(() => {
+                            this.$refs.typingInput.focus();
+                        });
                     },
+                    
+                    startTimer() {
+                        if (!this.timerStarted) {
+                            this.timerStarted = true;
+                            this.startTime = Date.now();
+                            this.timer = setInterval(() => {
+                                const elapsed = Math.floor((Date.now() - this.startTime) / 1000);
+                                this.elapsedSeconds = elapsed;
+                                
+                                // Calculate live WPM
+                                if (elapsed > 0) {
+                                    this.liveWpm = Math.floor((this.typedText.length / 5) / (elapsed / 60));
+                                }
+                                
+                                // Auto-submit after exactly 60 seconds
+                                if (elapsed >= this.testDuration) {
+                                    this.submitTest();
+                                }
+                            }, 1000);
+                        }
+                    },
+                    
+                    onInput() {
+                        // Start timer on first character
+                        if (this.typedText.length === 1 && !this.timerStarted) {
+                            this.startTimer();
+                        }
+                    },
+                    
                     destroy() {
-                        clearInterval(this.timer);
+                        if (this.timer) {
+                            clearInterval(this.timer);
+                        }
+                    },
+                    
+                    submitTest() {
+                        if (this.timer) {
+                            clearInterval(this.timer);
+                        }
+                        
+                        const finalElapsed = Math.floor((Date.now() - this.startTime) / 1000);
+                        const finalWpm = Math.floor((this.typedText.length / 5) / (finalElapsed / 60));
+                        
+                        // Calculate accuracy
+                        const originalText = @js($textSample->content);
+                        let correct = 0;
+                        const minLength = Math.min(this.typedText.length, originalText.length);
+                        
+                        for (let i = 0; i < minLength; i++) {
+                            if (this.typedText[i] === originalText[i]) {
+                                correct++;
+                            }
+                        }
+                        
+                        const accuracy = minLength > 0 ? (correct / minLength) * 100 : 0;
+                        
+                        // Submit to Livewire
+                        $wire.saveTestResults({
+                            typedText: this.typedText,
+                            duration: finalElapsed,
+                            wpm: finalWpm,
+                            accuracy: Math.round(accuracy * 100) / 100
+                        });
                     }
                 }"
             >
                 <!-- Timer and Stats -->
+                                <!-- Timer and Stats -->
                 <div class="flex justify-between items-center mb-6 pb-4 border-b">
                     <div class="flex items-center gap-6">
                         <div>
                             <div class="text-sm text-gray-500">Time Remaining</div>
-                            <div class="text-2xl font-bold" :class="$elapsedSeconds >= 50 ? 'text-red-600' : 'text-gray-900'">
-                                {{ 60 - $elapsedSeconds }}s
+                            <div class="text-2xl font-bold" 
+                                :class="timerStarted && elapsedSeconds >= 50 ? 'text-red-600' : (timerStarted ? 'text-gray-900' : 'text-blue-600')" 
+                                x-text="timerStarted ? ((testDuration - elapsedSeconds) + 's') : 'Ready'">
                             </div>
                         </div>
                         <div class="border-l-2 pl-6">
                             <div class="text-sm text-gray-500">Live WPM</div>
-                            <div class="text-2xl font-bold text-blue-600">
-                                {{ $liveWpm }}
+                            <div class="text-2xl font-bold text-blue-600" x-text="liveWpm">
                             </div>
                         </div>
                     </div>
                     <div>
                         <div class="text-sm text-gray-500 text-right">Progress</div>
-                        <div class="text-lg text-gray-600">
-                            {{ strlen($typedText) }} / {{ strlen($textSample->content) }}
+                        <div class="text-lg text-gray-600" x-text="typedText.length + ' / ' + @js(strlen($textSample->content))">
                         </div>
                     </div>
                 </div>
@@ -278,8 +319,8 @@ new class extends Component
                     <div class="h-2 bg-gray-200 rounded-full overflow-hidden">
                         <div
                             class="h-full transition-all duration-1000 ease-linear"
-                            :class="$elapsedSeconds >= 50 ? 'bg-red-500' : 'bg-blue-500'"
-                            :style="`width: ${($elapsedSeconds / 60) * 100}%`"
+                            :class="elapsedSeconds >= 50 ? 'bg-red-500' : 'bg-blue-500'"
+                            :style="`width: ${(elapsedSeconds / testDuration) * 100}%`"
                         ></div>
                     </div>
                 </div>
@@ -289,9 +330,9 @@ new class extends Component
                     <div
                         class="text-2xl leading-loose font-mono whitespace-pre-wrap wrap-break-word"
                         x-data="{
-                            typed: @entangle('typedText').live,
+                            originalText: @js($textSample->content),
                             scrollToPosition() {
-                                const currentChar = this.$el.querySelector('[data-index=\'' + this.typed.length + '\']');
+                                const currentChar = this.$el.querySelector('[data-index=\'' + this.typedText.length + '\']');
                                 if (currentChar) {
                                     currentChar.scrollIntoView({ behavior: 'smooth', block: 'center' });
                                 }
@@ -307,10 +348,10 @@ new class extends Component
                         @foreach ($chars as $index => $char)<span
                                 data-index="{{ $index }}"
                                 x-bind:class="{
-                                    'bg-green-200 text-green-900': typed.length > {{ $index }} && typed[{{ $index }}] === '{{ addslashes($char) }}',
-                                    'bg-red-200 text-red-900': typed.length > {{ $index }} && typed[{{ $index }}] !== '{{ addslashes($char) }}',
-                                    'bg-blue-300 text-blue-900 font-bold border-2 border-blue-500': typed.length === {{ $index }},
-                                    'text-gray-500': typed.length < {{ $index }}
+                                    'bg-green-200 text-green-900': typedText.length > {{ $index }} && typedText[{{ $index }}] === '{{ addslashes($char) }}',
+                                    'bg-red-200 text-red-900': typedText.length > {{ $index }} && typedText[{{ $index }}] !== '{{ addslashes($char) }}',
+                                    'bg-blue-300 text-blue-900 font-bold border-2 border-blue-500': typedText.length === {{ $index }},
+                                    'text-gray-500': typedText.length < {{ $index }}
                                 }"
                                 class="transition-colors duration-100 inline-block"
                                 style="min-width: {{ $char === ' ' ? '0.5em' : 'auto' }};"
@@ -322,28 +363,26 @@ new class extends Component
                 </div>
 
                 <!-- Typing Area (Hidden) -->
-                <div class="mb-6" x-data="{ focused: false }">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">
-                        Type the text above ({{ strlen($typedText) }}/{{ strlen($textSample->content) }} characters)
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-2" x-text="'Type the text above (' + typedText.length + '/' + @js(strlen($textSample->content)) + ' characters)'">
                     </label>
                     <textarea
-                        wire:model.live="typedText"
+                        x-ref="typingInput"
+                        x-model="typedText"
+                        @input="onInput()"
                         class="w-full h-32 px-4 py-3 border-2 rounded-lg focus:border-blue-500 focus:ring focus:ring-blue-200 font-mono text-lg"
-                        :class="focused ? 'border-blue-500' : 'border-gray-300'"
-                        placeholder="Start typing..."
-                        autofocus
-                        @focus="focused = true"
-                        @blur="focused = false"
-                        onpaste="return false;"
-                        oncopy="return false;"
-                        oncut="return false;"
-                        ondrop="return false;"
+                        :class="$el === document.activeElement ? 'border-blue-500' : 'border-gray-300'"
+                        placeholder="Start typing to begin timer..."
+                        @paste.prevent
+                        @copy.prevent
+                        @cut.prevent
+                        @drop.prevent
                         autocomplete="off"
                         spellcheck="false"
                     ></textarea>
                     <div class="flex justify-between items-center mt-1">
                         <p class="text-xs text-gray-500">
-                            ⚠️ Copy/paste is disabled • Test auto-submits when complete
+                            ⚠️ Copy/paste is disabled • Timer starts on first keystroke • Test auto-submits after 60 seconds
                         </p>
                         <div class="flex gap-4 text-xs">
                             <span class="flex items-center gap-1">
@@ -366,12 +405,12 @@ new class extends Component
                 <div class="mb-6">
                     <div class="flex justify-between text-sm text-gray-600 mb-2">
                         <span>Progress</span>
-                        <span>{{ number_format((strlen($typedText) / strlen($textSample->content)) * 100, 1) }}%</span>
+                        <span x-text="((typedText.length / @js(strlen($textSample->content))) * 100).toFixed(1) + '%'"></span>
                     </div>
                     <div class="w-full bg-gray-200 rounded-full h-2.5">
                         <div
                             class="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
-                            style="width: {{ (strlen($typedText) / strlen($textSample->content)) * 100 }}%"
+                            :style="`width: ${(typedText.length / @js(strlen($textSample->content))) * 100}%`"
                         ></div>
                     </div>
                 </div>
@@ -379,7 +418,7 @@ new class extends Component
                 <!-- Manual Submit Button (Optional) -->
                 <div class="flex justify-end">
                     <button
-                        wire:click="submitTest"
+                        @click="submitTest()"
                         class="bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-8 rounded-lg transition duration-200"
                     >
                         Submit Test Early
