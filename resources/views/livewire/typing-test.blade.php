@@ -216,7 +216,7 @@ new class extends Component
                     liveWpm: 0,
                     testDuration: 60,
                     timerStarted: false,
-                    
+
                     init() {
                         // Don't start timer yet - wait for first keystroke
                         // Focus the textarea
@@ -224,7 +224,7 @@ new class extends Component
                             this.$refs.typingInput.focus();
                         });
                     },
-                    
+
                     startTimer() {
                         if (!this.timerStarted) {
                             this.timerStarted = true;
@@ -232,12 +232,12 @@ new class extends Component
                             this.timer = setInterval(() => {
                                 const elapsed = Math.floor((Date.now() - this.startTime) / 1000);
                                 this.elapsedSeconds = elapsed;
-                                
+
                                 // Calculate live WPM
                                 if (elapsed > 0) {
                                     this.liveWpm = Math.floor((this.typedText.length / 5) / (elapsed / 60));
                                 }
-                                
+
                                 // Auto-submit after exactly 60 seconds
                                 if (elapsed >= this.testDuration) {
                                     this.submitTest();
@@ -245,41 +245,41 @@ new class extends Component
                             }, 1000);
                         }
                     },
-                    
+
                     onInput() {
                         // Start timer on first character
                         if (this.typedText.length === 1 && !this.timerStarted) {
                             this.startTimer();
                         }
                     },
-                    
+
                     destroy() {
                         if (this.timer) {
                             clearInterval(this.timer);
                         }
                     },
-                    
+
                     submitTest() {
                         if (this.timer) {
                             clearInterval(this.timer);
                         }
-                        
+
                         const finalElapsed = Math.floor((Date.now() - this.startTime) / 1000);
                         const finalWpm = Math.floor((this.typedText.length / 5) / (finalElapsed / 60));
-                        
+
                         // Calculate accuracy
                         const originalText = @js($textSample->content);
                         let correct = 0;
                         const minLength = Math.min(this.typedText.length, originalText.length);
-                        
+
                         for (let i = 0; i < minLength; i++) {
                             if (this.typedText[i] === originalText[i]) {
                                 correct++;
                             }
                         }
-                        
+
                         const accuracy = minLength > 0 ? (correct / minLength) * 100 : 0;
-                        
+
                         // Submit to Livewire
                         $wire.saveTestResults({
                             typedText: this.typedText,
@@ -296,8 +296,8 @@ new class extends Component
                     <div class="flex items-center gap-6">
                         <div>
                             <div class="text-sm text-gray-500">Time Remaining</div>
-                            <div class="text-2xl font-bold" 
-                                :class="timerStarted && elapsedSeconds >= 50 ? 'text-red-600' : (timerStarted ? 'text-gray-900' : 'text-blue-600')" 
+                            <div class="text-2xl font-bold"
+                                :class="timerStarted && elapsedSeconds >= 50 ? 'text-red-600' : (timerStarted ? 'text-gray-900' : 'text-blue-600')"
                                 x-text="timerStarted ? ((testDuration - elapsedSeconds) + 's') : 'Ready'">
                             </div>
                         </div>
