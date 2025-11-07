@@ -50,6 +50,8 @@ class extends Component
 
     public bool $submitted = false;
 
+    public bool $typingTestSent = false;
+
     public function mount(Position $position): void
     {
         // Check if position is open
@@ -124,10 +126,16 @@ class extends Component
                 ?: \App\Models\TypingTextSample::where('is_active', true)->inRandomOrder()->first()?->id;
 
             if ($textSampleId) {
-                TestInvitation::createForCandidate($candidate, $textSampleId);
+                $invitation = TestInvitation::createForCandidate($candidate, $textSampleId);
+
+                // Send typing test email
+                Mail::to($candidate->email)->send(new \App\Mail\TestInvitationMail($invitation));
 
                 // Update application status
                 $application->update(['status' => 'typing_test_sent']);
+
+                // Mark that typing test was sent
+                $this->typingTestSent = true;
             }
         }
 
@@ -161,7 +169,7 @@ class extends Component
                         Thank you for applying to {{ $position->title }}. We've received your application and will review it shortly.
                     </p>
 
-                    @if($position->auto_send_typing_test && $position->require_typing_test)
+                    @if($typingTestSent)
                         <div class="alert alert-info mb-6">
                             <x-icon name="o-envelope" class="w-6 h-6" />
                             <div class="text-left">
