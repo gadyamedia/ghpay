@@ -364,7 +364,7 @@ new class extends Component
                                 @endif
                             </td>
                             <td>
-                                <x-badge 
+                                <x-badge
                                     :value="str_replace('_', ' ', ucfirst($application->status))"
                                     class="{{ match($application->status) {
                                         'new' => 'badge-warning',

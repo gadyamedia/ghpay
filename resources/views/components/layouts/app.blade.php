@@ -48,7 +48,7 @@
                 @endif
 
                 <x-menu-item title="Dashboard" icon="o-chart-bar" link="{{ route('admin.dashboard') }}" route="admin.dashboard" />
-                
+
                 <x-menu-separator />
 
                 <x-menu-item title="Users" icon="o-users" link="{{ route('admin.users') }}"  route="admin.users" />
