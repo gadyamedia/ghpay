@@ -94,17 +94,12 @@ new class extends Component
     public function calculateLiveWpm(): void
     {
         if ($this->elapsedSeconds > 0 && strlen($this->typedText) > 0) {
-            // Analyze current typing to get correct characters
-            $analysis = TypingTest::analyzeTyping(
-                substr($this->textSample->content, 0, strlen($this->typedText)),
-                $this->typedText
-            );
+            // Calculate WPM based on total characters typed so far (Gross WPM)
+            // This matches how typingtest.com and other typing tests calculate it
+            $typedLength = strlen($this->typedText);
 
-            $correctChars = $analysis['correct_characters'];
-
-            // Calculate WPM based on correct characters typed so far
             $this->liveWpm = TypingTest::calculateWpm(
-                $correctChars,
+                $typedLength,
                 $this->elapsedSeconds
             );
         } else {
@@ -138,8 +133,9 @@ new class extends Component
         $this->incorrectCharacters = $analysis['incorrect_characters'];
 
         // Calculate metrics
+        // WPM uses total characters typed (Gross WPM), not just correct ones
         $this->wpm = TypingTest::calculateWpm(
-            $this->correctCharacters,
+            $this->totalCharacters,
             $this->elapsedSeconds
         );
 
@@ -277,7 +273,7 @@ new class extends Component
                 <!-- Text to Type with Real-time Highlighting (Condensed View) -->
                 <div class="bg-gray-50 rounded-lg p-6 mb-6 border-2 border-gray-300 select-none overflow-hidden">
                     <div
-                        class="text-2xl leading-loose font-mono whitespace-pre-wrap break-words"
+                        class="text-2xl leading-loose font-mono whitespace-pre-wrap wrap-break-word"
                         x-data="{
                             typed: @entangle('typedText').live,
                             scrollToPosition() {

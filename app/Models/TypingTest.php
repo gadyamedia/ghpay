@@ -41,9 +41,16 @@ class TypingTest extends Model
 
     /**
      * Calculate WPM (Words Per Minute)
-     * Standard: 1 word = 5 characters
-     * Formula: Total Number of Words = Total Keys Pressed / 5
-     *          WPM = Total Number of Words / Time Elapsed in Minutes (rounded down)
+     * Standard: 1 word = 5 characters (industry standard)
+     *
+     * Gross WPM = (All Typed Characters / 5) / Time in Minutes
+     * Net WPM = Gross WPM - (Errors / Time in Minutes)
+     *
+     * This calculates Gross WPM (raw typing speed)
+     *
+     * @param  int  $totalCharacters  Total characters typed (not just correct ones)
+     * @param  int  $durationSeconds  Time taken in seconds
+     * @return int WPM rounded down
      */
     public static function calculateWpm(int $totalCharacters, int $durationSeconds): int
     {
@@ -71,25 +78,30 @@ class TypingTest extends Model
 
     /**
      * Compare typed text with original and return stats
+     *
+     * @param  string  $originalText  The text that should have been typed
+     * @param  string  $typedText  The text that was actually typed
+     * @return array Stats including total_characters (what was typed), correct, and incorrect
      */
     public static function analyzeTyping(string $originalText, string $typedText): array
     {
         $originalChars = str_split($originalText);
         $typedChars = str_split($typedText);
 
-        $totalCharacters = count($originalChars);
+        $totalTypedCharacters = count($typedChars); // How many characters were actually typed
         $correctCharacters = 0;
 
+        // Compare character by character
         for ($i = 0; $i < min(count($originalChars), count($typedChars)); $i++) {
             if ($originalChars[$i] === $typedChars[$i]) {
                 $correctCharacters++;
             }
         }
 
-        $incorrectCharacters = $totalCharacters - $correctCharacters;
+        $incorrectCharacters = $totalTypedCharacters - $correctCharacters;
 
         return [
-            'total_characters' => $totalCharacters,
+            'total_characters' => $totalTypedCharacters, // Changed: now returns typed length, not original length
             'correct_characters' => $correctCharacters,
             'incorrect_characters' => max(0, $incorrectCharacters),
         ];
