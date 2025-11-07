@@ -84,10 +84,8 @@ new class extends Component
             // Calculate live WPM
             $this->calculateLiveWpm();
 
-            // Auto-submit when finished typing
-            if (strlen($this->typedText) >= strlen($this->textSample->content)) {
-                $this->submitTest();
-            }
+            // Note: Test now auto-submits after 60 seconds (see updateTimer method)
+            // Users can also manually submit before time runs out
         }
     }
 
@@ -113,6 +111,11 @@ new class extends Component
         if ($this->testStatus === 'in_progress' && $this->timerStarted) {
             $this->elapsedSeconds++;
             $this->calculateLiveWpm();
+
+            // Auto-submit after 60 seconds (1 minute - standard typing test duration)
+            if ($this->elapsedSeconds >= 60) {
+                $this->submitTest();
+            }
         }
     }
 
@@ -196,25 +199,25 @@ new class extends Component
                             <svg class="w-5 h-5 text-blue-500 mr-2 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                                 <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
                             </svg>
+                            <span><strong>You have 60 seconds</strong> to type as much of the text as you can</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg class="w-5 h-5 text-blue-500 mr-2 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                            </svg>
                             <span>Type the text exactly as shown, including punctuation and spacing</span>
                         </li>
                         <li class="flex items-start">
                             <svg class="w-5 h-5 text-blue-500 mr-2 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                                 <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
                             </svg>
-                            <span>Your words per minute (WPM) and accuracy will be calculated</span>
+                            <span>The timer starts automatically when you begin typing</span>
                         </li>
                         <li class="flex items-start">
                             <svg class="w-5 h-5 text-blue-500 mr-2 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                                 <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
                             </svg>
-                            <span>The timer starts when you begin typing</span>
-                        </li>
-                        <li class="flex items-start">
-                            <svg class="w-5 h-5 text-blue-500 mr-2 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
-                            </svg>
-                            <span>Click "Submit" when you're done or when time runs out</span>
+                            <span>The test auto-submits after 60 seconds or you can submit early</span>
                         </li>
                     </ul>
                 </div>
@@ -250,9 +253,9 @@ new class extends Component
                 <div class="flex justify-between items-center mb-6 pb-4 border-b">
                     <div class="flex items-center gap-6">
                         <div>
-                            <div class="text-sm text-gray-500">Time</div>
-                            <div class="text-2xl font-bold text-gray-900">
-                                {{ floor($elapsedSeconds / 60) }}:{{ str_pad($elapsedSeconds % 60, 2, '0', STR_PAD_LEFT) }}
+                            <div class="text-sm text-gray-500">Time Remaining</div>
+                            <div class="text-2xl font-bold" :class="$elapsedSeconds >= 50 ? 'text-red-600' : 'text-gray-900'">
+                                {{ 60 - $elapsedSeconds }}s
                             </div>
                         </div>
                         <div class="border-l-2 pl-6">
@@ -263,10 +266,21 @@ new class extends Component
                         </div>
                     </div>
                     <div>
-                        <div class="text-sm text-gray-500 text-right">Characters</div>
+                        <div class="text-sm text-gray-500 text-right">Progress</div>
                         <div class="text-lg text-gray-600">
                             {{ strlen($typedText) }} / {{ strlen($textSample->content) }}
                         </div>
+                    </div>
+                </div>
+
+                <!-- Time Progress Bar -->
+                <div class="mb-6">
+                    <div class="h-2 bg-gray-200 rounded-full overflow-hidden">
+                        <div 
+                            class="h-full transition-all duration-1000 ease-linear"
+                            :class="$elapsedSeconds >= 50 ? 'bg-red-500' : 'bg-blue-500'"
+                            :style="`width: ${($elapsedSeconds / 60) * 100}%`"
+                        ></div>
                     </div>
                 </div>
 
