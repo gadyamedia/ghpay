@@ -36,7 +36,7 @@ class extends Component
                 </a>
 
                 <h1 class="text-3xl md:text-4xl font-bold mb-4">{{ $position->title }}</h1>
-                
+
                 @if($position->department)
                     <p class="text-xl opacity-90 mb-4">{{ $position->department }}</p>
                 @endif
@@ -51,15 +51,15 @@ class extends Component
                         class="badge-lg bg-white/20 text-white border-white/30"
                     />
                     @if($position->location)
-                        <x-badge 
-                            :value="$position->location" 
-                            class="badge-lg bg-white/20 text-white border-white/30" 
+                        <x-badge
+                            :value="$position->location"
+                            class="badge-lg bg-white/20 text-white border-white/30"
                         />
                     @endif
                     @if($position->require_typing_test)
-                        <x-badge 
-                            value="Typing Test Required" 
-                            class="badge-lg bg-warning/20 text-white border-warning/30" 
+                        <x-badge
+                            value="Typing Test Required"
+                            class="badge-lg bg-warning/20 text-white border-warning/30"
                         />
                     @endif
                 </div>
@@ -115,7 +115,7 @@ class extends Component
                 <!-- Apply Card -->
                 <x-card>
                     <h3 class="text-xl font-bold mb-4">Ready to Apply?</h3>
-                    
+
                     @if($position->show_salary && $position->salary_min && $position->salary_max)
                         <div class="mb-6 p-4 bg-primary/5 rounded-lg">
                             <p class="text-sm text-gray-600 mb-1">Salary Range</p>
@@ -176,7 +176,7 @@ class extends Component
                 <x-card x-data="{ copied: false }">
                     <h3 class="text-lg font-bold mb-3">Share this Position</h3>
                     <div class="flex gap-2">
-                        <button 
+                        <button
                             type="button"
                             class="btn btn-sm flex-1"
                             @click="navigator.clipboard.writeText(window.location.href).then(() => { copied = true; setTimeout(() => copied = false, 2000); })"
