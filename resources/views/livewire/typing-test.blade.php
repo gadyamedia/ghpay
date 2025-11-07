@@ -276,7 +276,7 @@ new class extends Component
                 <!-- Time Progress Bar -->
                 <div class="mb-6">
                     <div class="h-2 bg-gray-200 rounded-full overflow-hidden">
-                        <div 
+                        <div
                             class="h-full transition-all duration-1000 ease-linear"
                             :class="$elapsedSeconds >= 50 ? 'bg-red-500' : 'bg-blue-500'"
                             :style="`width: ${($elapsedSeconds / 60) * 100}%`"
