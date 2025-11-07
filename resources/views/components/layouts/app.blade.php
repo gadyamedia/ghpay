@@ -55,6 +55,11 @@
                 <x-menu-item title="Candidates" icon="o-user-group" link="{{ route('admin.candidates.index') }}" route="admin.candidates.*" />
                 <x-menu-item title="Typing Samples" icon="o-document-text" link="{{ route('admin.typing-samples.index') }}" route="admin.typing-samples.*" />
 
+                <x-menu-separator />
+
+                <x-menu-item title="Job Positions" icon="o-briefcase" link="{{ route('admin.positions.index') }}" route="admin.positions.*" />
+                <x-menu-item title="Applications" icon="o-inbox" link="{{ route('admin.applications.index') }}" route="admin.applications.*" />
+
 
             </x-menu>
         </x-slot:sidebar>

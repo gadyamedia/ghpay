@@ -316,7 +316,7 @@ new class extends Component {
     </div>
 
     <!-- Modal -->
-    <x-modal wire:model="showModal" :title="$editingId ? 'Edit Candidate' : 'Add Candidate'" subtitle="Manage candidate information" class="backdrop-blur">
+    <x-modal wire:model="showModal" :title="$editingId ? 'Edit Candidate' : 'Add Candidate'" subtitle="Manage candidate information">
         <x-form wire:submit="save">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <x-input
@@ -403,7 +403,7 @@ new class extends Component {
                                 {{ $selectedTestSampleId === $sample->id ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-300 dark:border-gray-600' }}">
                                 <input
                                     type="radio"
-                                    wire:model="selectedTestSampleId"
+                                    wire:model.live="selectedTestSampleId"
                                     value="{{ $sample->id }}"
                                     class="mt-1 mr-3"
                                 >
@@ -438,10 +438,10 @@ new class extends Component {
 
             <x-slot:actions>
                 <x-button label="Cancel" @click="$wire.showTestModal = false" />
-                <x-button 
-                    label="Send Test Invitation" 
-                    class="btn-primary" 
-                    type="submit" 
+                <x-button
+                    label="Send Test Invitation"
+                    class="btn-primary"
+                    type="submit"
                     spinner="sendInvitation"
                     :disabled="!$selectedTestSampleId"
                 />

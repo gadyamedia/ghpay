@@ -6,6 +6,7 @@ use App\Models\User;
 use Hash;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Yajra\Address\Seeders\AddressSeeder;
 
 class DatabaseSeeder extends Seeder
 {
@@ -20,6 +21,7 @@ class DatabaseSeeder extends Seeder
 
         $this->call([
             RolesTableSeeder::class,
+            AddressSeeder::class,
             // PayPeriodSeeder::class,
         ]);
 
@@ -29,6 +31,8 @@ class DatabaseSeeder extends Seeder
             'password' => Hash::make('Kostyavika1'),
             'role_id' => 1,
         ]);
+
+
 
     }
 }
