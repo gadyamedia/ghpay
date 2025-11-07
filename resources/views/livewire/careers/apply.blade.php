@@ -124,11 +124,7 @@ class extends Component
                 ?: \App\Models\TypingTextSample::where('is_active', true)->inRandomOrder()->first()?->id;
 
             if ($textSampleId) {
-                TestInvitation::create([
-                    'candidate_id' => $candidate->id,
-                    'typing_text_sample_id' => $textSampleId,
-                    'status' => 'pending',
-                ]);
+                TestInvitation::createForCandidate($candidate, $textSampleId);
 
                 // Update application status
                 $application->update(['status' => 'typing_test_sent']);
