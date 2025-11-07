@@ -1,5 +1,6 @@
 <?php
 
+use App\Mail\ApplicationRejected;
 use App\Mail\ApplicationStatusUpdated;
 use App\Models\Application;
 use App\Models\Position;
@@ -71,8 +72,12 @@ new class extends Component
         $application = Application::findOrFail($applicationId);
         $application->updateStatus($status);
 
-        // Send status update email to applicant
-        Mail::to($application->email)->send(new ApplicationStatusUpdated($application));
+        // Send appropriate email based on status
+        if ($status === 'rejected') {
+            Mail::to($application->email)->send(new ApplicationRejected($application));
+        } else {
+            Mail::to($application->email)->send(new ApplicationStatusUpdated($application));
+        }
 
         $this->dispatch('application-updated');
         $this->dispatch('notify', message: 'Application status updated successfully', type: 'success');
@@ -126,7 +131,18 @@ new class extends Component
             return;
         }
 
-        Application::whereIn('id', $this->selectedApplications)->update(['status' => $status]);
+        $applications = Application::whereIn('id', $this->selectedApplications)->get();
+
+        foreach ($applications as $application) {
+            $application->updateStatus($status);
+
+            // Send appropriate email based on status
+            if ($status === 'rejected') {
+                Mail::to($application->email)->send(new ApplicationRejected($application));
+            } else {
+                Mail::to($application->email)->send(new ApplicationStatusUpdated($application));
+            }
+        }
 
         $this->selectedApplications = [];
         $this->selectAll = false;
