@@ -327,7 +327,7 @@ new class extends Component
             $application = Application::with(['position', 'candidate', 'reviewedBy'])->find($viewingId);
         @endphp
 
-        <x-modal wire:model="showDetailModal" title="Application Details" subtitle="{{ $application->first_name }} {{ $application->last_name }}" class="backdrop-blur" persistent>
+        <x-modal wire:model="showDetailModal" title="Application Details" subtitle="{{ $application->first_name }} {{ $application->last_name }}">
             <div class="space-y-6">
                 <!-- Applicant Information -->
                 <div>
