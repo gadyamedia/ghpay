@@ -171,7 +171,7 @@ new class extends Component
             @if(count($selectedApplications) > 0)
                 <x-dropdown label="Bulk Actions ({{ count($selectedApplications) }})" class="btn-primary">
                     <x-menu-item title="Mark as Reviewed" icon="o-check" wire:click="bulkUpdateStatus('reviewed')" />
-                    <x-menu-item title="Move to Interview" icon="o-users" wire:click="bulkUpdateStatus('interview')" />
+                    <x-menu-item title="Schedule Interview" icon="o-calendar" wire:click="bulkUpdateStatus('interview')" />
                     <x-menu-item title="Send Offer" icon="o-hand-thumb-up" wire:click="bulkUpdateStatus('offer')" />
                     <x-menu-item title="Reject" icon="o-x-mark" wire:click="bulkUpdateStatus('rejected')" />
                 </x-dropdown>
@@ -307,7 +307,7 @@ new class extends Component
                             <x-menu-item title="Mark as Reviewed" icon="o-check" wire:click="markAsReviewed({{ $application->id }})" />
                         @endif
 
-                        <x-menu-item title="Move to Interview" icon="o-users" wire:click="updateStatus({{ $application->id }}, 'interview')" />
+                        <x-menu-item title="Schedule Interview" icon="o-calendar" wire:click="updateStatus({{ $application->id }}, 'interview')" />
                         <x-menu-item title="Send Offer" icon="o-hand-thumb-up" wire:click="updateStatus({{ $application->id }}, 'offer')" />
                         <x-menu-separator />
                         <x-menu-item title="Reject" icon="o-x-mark" wire:click="updateStatus({{ $application->id }}, 'rejected')" />
